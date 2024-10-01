@@ -86,7 +86,7 @@ final class ContentViewModel: ObservableObject, @unchecked Sendable {
             .receive(on: DispatchQueue.global())
             .print("receiveOn isMainThread: \(Thread.isMainThread), currentThread: \(Thread.current)")
             .delay(for: .seconds(1), scheduler: DispatchQueue.global())
-            .receive(on: DispatchQueue.main)
+            .receive(on: DispatchQueue.main) // Have to switch back to main queue otherwise I get runtime warning
             .sink { [weak self] values in
                 self?.printThread("sink")
                 self?.showLoading = false
