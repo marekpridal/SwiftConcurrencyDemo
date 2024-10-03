@@ -2,8 +2,8 @@ import Combine
 import Foundation
 
 /// **Project configuration**
-/// - Set *Strict Concurrency Checking* to **Complete**
-/// - If possible set *Swift* to version **6**
+/// - Set *Strict Concurrency Checking* to **Targeted** or **Complete**
+/// - When possible set *Swift* to version **6**
 
 @globalActor
 actor MyOwnGlobalActor {
@@ -19,11 +19,15 @@ final class ContentViewModel: ObservableObject, @unchecked Sendable {
 
     private var disposeBag = Set<AnyCancellable>.init()
     private var streamTask: Task<(), any Error>?
+    private let converter = Converter()
 
     deinit {
         print("Deinit of \(self)")
     }
+}
 
+// MARK: - Swift Concurrency
+extension ContentViewModel {
     @MainActor
     func triggerApiCall() async {
         showLoading = true
@@ -152,5 +156,40 @@ final class ContentViewModel: ObservableObject, @unchecked Sendable {
 
     private func printThread(_ method: String) {
         print("\(method) isMainThread: \(Thread.isMainThread), currentThread: \(Thread.current)")
+    }
+}
+
+struct Converter: Sendable {
+/*
+    deinit {
+        print("Deinit of \(self)")
+    }
+*/
+
+    private let value = "123456"
+
+    func perform() {
+        print(#function, " with value \(value)")
+    }
+}
+
+// MARK: - Memmory leak
+extension ContentViewModel {
+    func performEscapingClosure() {
+        DispatchQueue.global().async { [weak self] in
+            self?.printThread(#function)
+            self?.escapingClosure(closure: self?.converter.perform)
+            //self?.escapingClosure { [weak self] in self?.converter.perform() }
+        }
+    }
+
+    func escapingClosure(closure: (@Sendable() -> Void)?) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+            closure?()
+        }
+    }
+
+    func ownMethod() {
+        print(#function)
     }
 }

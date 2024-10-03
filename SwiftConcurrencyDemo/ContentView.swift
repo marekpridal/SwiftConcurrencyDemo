@@ -43,6 +43,7 @@ struct ContentView: View {
             Button("Stop stream") {
                 viewModel.stopStream()
             }
+            Button("Perform escaping closure", action: viewModel.performEscapingClosure)
         }
         /*
         .onDisappear {
