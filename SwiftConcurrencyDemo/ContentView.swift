@@ -12,9 +12,14 @@ struct ContentView: View {
                 Text(timer.formatted(date: .omitted, time: .complete))
                     .contentTransition(.numericText())
             }
-            Button("Trigger API call") {
+            Button("Trigger API call Serial") {
                 Task {
-                    await viewModel.triggerApiCall()
+                    await viewModel.triggerApiCallSerial()
+                }
+            }
+            Button("Trigger API call in Parallel") {
+                Task {
+                    await viewModel.triggerApiCallInParallel()
                 }
             }
             Button("Main Actor run") {

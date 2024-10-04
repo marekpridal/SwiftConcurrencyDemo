@@ -28,20 +28,42 @@ final class ContentViewModel: ObservableObject, @unchecked Sendable {
 
 // MARK: - Swift Concurrency
 extension ContentViewModel {
+    struct FirstError: Error { }
+    struct SecondError: Error { }
+    struct ThirdError: Error { }
+
     @MainActor
-    func triggerApiCall() async {
+    func triggerApiCallSerial() async {
+        showLoading = true
+        do {
+            try await firstApiCall()
+            try await secondApiCall()
+            try await thirdApiCall()
+        } catch {
+            print("Error: \(error)")
+            switch error {
+            case is FirstError:
+                print("First error")
+            case is SecondError:
+                print("Second error")
+            default:
+                print("Generic error")
+            }
+        }
+        showLoading = false
+    }
+
+    @MainActor
+    func triggerApiCallInParallel() async {
         showLoading = true
         printThread(#function)
         do {
             try await withThrowingDiscardingTaskGroup { [weak self] group in
                 group.addTask { [weak self] in
+                    try await self?.secondApiCall()
+                }
+                group.addTask { [weak self] in
                     try await self?.firstApiCall()
-                }
-                group.addTask { [weak self] in
-                    try await self?.secondApiCall()
-                }
-                group.addTask { [weak self] in
-                    try await self?.secondApiCall()
                 }
                 group.addTask { [weak self] in
                     try await self?.thirdApiCall()
@@ -134,24 +156,31 @@ extension ContentViewModel {
     }
 
     private func firstApiCall() async throws {
-        try await Task.sleep(for: .seconds(1))
-        printThread(#function)
+        printThread(#function + " Started")
+        try await Task.sleep(for: .seconds(0.5))
+        printThread(#function + " Done")
+        throw FirstError()
     }
 
     private func secondApiCall() async throws {
+        printThread(#function + " Started")
         try await Task.sleep(for: .seconds(1))
-        printThread(#function)
+        printThread(#function + " Done")
+        throw SecondError()
     }
 
     private func thirdApiCall() async throws {
-        try await Task.sleep(for: .seconds(1))
-        printThread(#function)
+        printThread(#function + " Started")
+        try await Task.sleep(for: .seconds(1.5))
+        printThread(#function + " Done")
+        throw ThirdError()
     }
 
     @MainActor
     private func mainActorMethod() async throws {
-        try await Task.sleep(for: .seconds(1))
-        printThread(#function)
+        printThread(#function + " Started")
+        try await Task.sleep(for: .seconds(2))
+        printThread(#function + " Done")
     }
 
     private func printThread(_ method: String) {
@@ -159,22 +188,22 @@ extension ContentViewModel {
     }
 }
 
-struct Converter: Sendable {
-/*
-    deinit {
-        print("Deinit of \(self)")
-    }
-*/
-
-    private let value = "123456"
-
-    func perform() {
-        print(#function, " with value \(value)")
-    }
-}
-
 // MARK: - Memmory leak
 extension ContentViewModel {
+    struct Converter: Sendable {
+    /*
+        deinit {
+            print("Deinit of \(self)")
+        }
+    */
+
+        private let value = "123456"
+
+        func perform() {
+            print(#function, " with value \(value)")
+        }
+    }
+
     func performEscapingClosure() {
         DispatchQueue.global().async { [weak self] in
             self?.printThread(#function)
