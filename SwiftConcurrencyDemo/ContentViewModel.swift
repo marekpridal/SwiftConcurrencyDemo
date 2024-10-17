@@ -15,6 +15,8 @@ final class ContentViewModel: ObservableObject, @unchecked Sendable {
     @MainActor @Published private(set) var showLoading = false
     @MainActor @Published private(set) var timer: Date?
 
+    var completionHandler: (() -> Void)?
+
     @MyOwnGlobalActor private var globalActor = false
 
     private var disposeBag = Set<AnyCancellable>.init()
@@ -220,5 +222,142 @@ extension ContentViewModel {
 
     func ownMethod() {
         print(#function)
+    }
+
+    // Tip: NO LEAK
+    // OK
+    func performAction1() {
+        performSomeOperationWithCompletion { [weak self] in
+            self?.doSomethingWithCompletion {
+                self?.doWork()
+            }
+        }
+    }
+
+    // TIP: LEAK
+    // OK
+    func performAction2() {
+        performSomeOperationWithCompletion {
+            self.doSomethingWithCompletion {
+                self.doWork()
+            }
+        }
+    }
+
+    // TIP: NO LEAK
+    // OK
+    func performAction3() {
+        performSomeOperationWithCompletion { [weak self] in
+            guard let strongSelf = self else { return }
+            strongSelf.doSomethingWithCompletion {
+                self?.doWork()
+            }
+        }
+    }
+
+    // TIP: Crash
+    // OK
+    func performAction4() {
+        performSomeOperationWithCompletion { [unowned self] in
+            self.doSomethingWithCompletion {
+                self.doWork()
+            }
+        }
+    }
+
+    // TIP: LEAK
+    // OK
+    func performAction5() {
+        performLongRunningOperation {
+            self.doWork()
+        }
+    }
+
+    // TIP: NO LEAK
+    // OK
+    func performAction6() {
+        performAsyncOperation { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                self?.doWork()
+            }
+        }
+    }
+
+    // TIP: NO LEAK
+    // OK
+    func performAction7() {
+        performSomeOperationWithCompletion { [weak self] in
+            self?.doSomethingWithCompletion { [weak self] in
+                self?.doWork()
+            }
+        }
+    }
+
+    // TIP: LEAK
+    // NOT-OK - Main executes swiftly and releases self. So theoretically leak but not in practice.
+    func performAction8() {
+        performAsyncOperation { [weak self] in
+            guard let strongSelf = self else { return }
+            DispatchQueue.main.async {
+                strongSelf.doWork()
+            }
+        }
+    }
+
+    // TIP: LEAK
+    // OK
+    func performAction81() {
+        performAsyncOperation { [weak self] in
+            guard let strongSelf = self else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                strongSelf.doWork()
+            }
+        }
+    }
+
+    // TIP: Crash
+    // OK
+    func performAction9() {
+        performAsyncOperation { [unowned self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                self.doWork()
+            }
+        }
+    }
+
+    // TIP: LEAK
+    // OK
+    func performAction10() {
+        completionHandler = {
+            self.doWork()
+        }
+    }
+
+    func performSomeOperationWithCompletion(_ block: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            block()
+        }
+    }
+
+    func doSomethingWithCompletion(_ block: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            block()
+        }
+    }
+
+    func doWork() {
+        print("\(self)")
+    }
+
+    func performLongRunningOperation(_ block: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            block()
+        }
+    }
+
+    func performAsyncOperation(_ block: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            block()
+        }
     }
 }
